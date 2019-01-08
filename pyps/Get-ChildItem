@@ -1,0 +1,61 @@
+#! /usr/bin/env python
+
+import os
+from FilePermissions import *
+from datetime import datetime
+import argparse
+
+working_directory = "./"
+delimiter = "     "
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-Path', metavar='P', type=str, default=".",
+                    help="The path to get list of files/directories")
+
+args = parser.parse_args()
+
+working_directory = args.Path
+
+# Header
+
+print "\n" + "\n" + "    Directory: " + os.path.abspath(working_directory) + "\n" + "\n"
+print "Mode                  LastWriteTime     Length Name"
+print "----                  -------------     ------ ----"
+
+for filename in os.listdir(working_directory):
+    if working_directory[-1] != "/":
+        file_path = working_directory + "/" + filename
+    else:
+        file_path = working_directory + filename
+    file_stat = os.stat(file_path)
+
+    # File type
+    file_type = "-"
+    if os.path.isdir(file_path):
+        file_type = "d"
+
+    # Permissions
+    mode = file_stat.st_mode
+
+    # Last Write Time
+    if file_stat.st_mtime > file_stat.st_ctime:
+        last_write = datetime.fromtimestamp(file_stat.st_mtime)
+    else:
+        last_write = datetime.fromtimestamp(file_stat.st_ctime)
+
+    # File Size
+    file_size_buffer = ""
+    if len(str(file_stat.st_size)) < 7:
+        file_size_length = 7 - len(str(file_stat.st_size))
+        for space in range(1, file_size_length):
+            file_size_buffer += " "
+
+    print file_type + \
+          UserPermissions.formatAsString(mode) + \
+          GroupPermissions.formatAsString(mode) + \
+          OtherPermissions.formatAsString(mode) + \
+          delimiter + \
+          last_write.strftime("%d/%m/%Y  %I:%M %p") + \
+          delimiter + \
+          str(file_size_buffer) + str(file_stat.st_size) + " " + \
+          os.path.abspath(file_path)
