@@ -8,9 +8,12 @@
 #   -Depth <UInt32>
 #   -Attributes <System.Management.Automation.FlagsExpression`1[System.IO.FileAttributes]>
 #   -FollowSymLink
-#   -Directory
 #   -ReadOnly
 #   -System
+
+# Partially implemented:
+#   Path <String[]>
+#       Currently can accept one argument, looping/recurse not working yet.
 
 import os
 from FilePermissions import *
@@ -44,15 +47,12 @@ if args.path:
 if args.Path:
     working_directory = args.Path
 
-def print_file_row(file_size_buffer,
-                   file_stat,
+def print_file_row(file_stat,
                    file_path):
     """
     Prints the formatted row.
 
     Arguments:
-        file_size_buffer    str         Number of spaces in front of the file
-                                        size string to align it properly
         file_stat           tuple       os.stat return of the file
         file_path           str         The absolute filepath
     """
@@ -61,6 +61,12 @@ def print_file_row(file_size_buffer,
         last_write = datetime.fromtimestamp(file_stat.st_mtime)
     else:
         last_write = datetime.fromtimestamp(file_stat.st_ctime)
+
+    file_size_buffer = ""
+    if len(str(file_stat.st_size)) < 7:
+        file_size_length = 7 - len(str(file_stat.st_size))
+        for space in range(1, file_size_length):
+            file_size_buffer += " "
 
     if args.Name is True:
         print os.path.abspath(file_path)
@@ -106,51 +112,34 @@ for filename in os.listdir(working_directory):
         for space in range(1, file_size_length):
             file_size_buffer += " "
 
-    # Boolean flag logic
-    if args.Force is True and args.Hidden is False and args.File is False:
-        print_file_row(file_size_buffer,
-                       file_stat,
+    # Non-hidden file
+    if all([file_type == "-",
+            args.Directory is False,
+            args.Hidden is False,
+            not filename.startswith(".")]):
+        print_file_row(file_stat,
                        file_path)
-    elif args.Force is True and args.Hidden is False and args.File is True:
-        if file_type != "d":
-            print_file_row(file_size_buffer,
-                           file_stat,
-                           file_path)
-            
-    elif args.Force is False and args.Hidden is False and args.File is False:
-        if filename.startswith("."):
-            pass
-        else:
-            print_file_row(file_size_buffer,
-                           file_stat,
-                           file_path)
-    elif args.Force is False and args.Hidden is False and args.File is True:
-        if file_type != "d":
-            if filename.startswith("."):
-                pass
-            else:
-                print_file_row(file_size_buffer,
-                               file_stat,
-                               file_path)
-    elif args.Force is False and args.Hidden is True and args.File is False:
-        if filename.startswith("."):
-            print_file_row(file_size_buffer,
-                           file_stat,
-                           file_path)
-    elif args.Force is False and args.Hidden is True and args.File is True:
-        if file_type != "d":
-            if filename.startswith("."):
-                print_file_row(file_size_buffer,
-                               file_stat,
-                               file_path)
-    elif args.Force is True and args.Hidden is True and args.File is False:
-        if filename.startswith("."):
-            print_file_row(file_size_buffer,
-                           file_stat,
-                           file_path)
-    elif args.Force is True and args.Hidden is True and args.File is True:
-        if file_type != "d":
-            if filename.startswith("."):
-                print_file_row(file_size_buffer,
-                               file_stat,
-                               file_path)
+
+    # Hidden file
+    if all([file_type == "-",
+            args.Directory is False,
+            (args.Hidden or args.Force),
+            filename.startswith(".")]):
+        print_file_row(file_stat,
+                       file_path)
+
+    # Non-hidden directory
+    if all([file_type == "d",
+            args.File is False,
+            args.Hidden is False,
+            not filename.startswith(".")]):
+        print_file_row(file_stat,
+                       file_path)
+
+    # Hidden directory
+    if all([file_type == "d",
+            args.File is False,
+            (args.Hidden or args.Force),
+            filename.startswith(".")]):
+        print_file_row(file_stat,
+                       file_path)
