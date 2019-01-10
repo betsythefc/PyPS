@@ -113,13 +113,13 @@ def print_file_row(stat,
               str(file_size_buffer) + str(stat.st_size) + " " + \
               os.path.abspath(path)
 
-WORKING_DIRECTORY = "./"
+WORKING_DIRECTORIES = []
 DELIMITER = "     "
 
 PARSER = argparse.ArgumentParser()
-PARSER.add_argument('path', metavar='PATH', type=str, nargs="?",
+PARSER.add_argument('path', metavar='PATH', type=str, nargs="*",
                     help='The path to get list of files/directories')
-PARSER.add_argument('-Path', '-path', metavar='string', type=str,
+PARSER.add_argument('-Path', '-path', metavar='string', type=str, nargs="*",
                     help='The paths to the items from which content is to ' + \
                          'be retrieved. Wildcards are permitted. Default is' + \
                          ' the current directory (.)')
@@ -150,76 +150,81 @@ PARSER.add_argument('-Name', '-name', action='store_true',
 
 ARGS = PARSER.parse_args()
 
-if ARGS.path:
-    WORKING_DIRECTORY = ARGS.path
+if ARGS.Path is not None:
+    for path in ARGS.Path:
+        WORKING_DIRECTORIES.append(path)
+elif ARGS.path is not None:
+    for path in ARGS.path:
+        WORKING_DIRECTORIES.append(path)
+else:
+    WORKING_DIRECTORIES = ["./"]
 
-if ARGS.Path:
-    WORKING_DIRECTORY = ARGS.Path
+for WORKING_DIRECTORY in WORKING_DIRECTORIES:
 
-# Header
-if ARGS.Name is False:
-    print "\n" + "\n" + "    Directory: " + os.path.abspath(WORKING_DIRECTORY) + "\n" + "\n"
-    print "Mode             LastWriteTime     Length Name"
-    print "----             -------------     ------ ----"
+    # Header
+    if ARGS.Name is False:
+        print "\n" + "\n" + "    Directory: " + os.path.abspath(WORKING_DIRECTORY) + "\n" + "\n"
+        print "Mode             LastWriteTime     Length Name"
+        print "----             -------------     ------ ----"
 
-for filename in os.listdir(WORKING_DIRECTORY):
-    if WORKING_DIRECTORY[-1] != "/":
-        file_path = WORKING_DIRECTORY + "/" + filename
-    else:
-        file_path = WORKING_DIRECTORY + filename
+    for filename in os.listdir(WORKING_DIRECTORY):
+        if WORKING_DIRECTORY[-1] != "/":
+            file_path = WORKING_DIRECTORY + "/" + filename
+        else:
+            file_path = WORKING_DIRECTORY + filename
 
-    file_stat = os.stat(file_path)
-    filemode = FileMode(file_path, file_stat)
+        file_stat = os.stat(file_path)
+        filemode = FileMode(file_path, file_stat)
 
-    if file_stat.st_mtime > file_stat.st_ctime:
-        last_write = datetime.fromtimestamp(file_stat.st_mtime)
-    else:
-        last_write = datetime.fromtimestamp(file_stat.st_ctime)
+        if file_stat.st_mtime > file_stat.st_ctime:
+            last_write = datetime.fromtimestamp(file_stat.st_mtime)
+        else:
+            last_write = datetime.fromtimestamp(file_stat.st_ctime)
 
-    file_info = {
-        "Mode": filemode.modeString(),
-        "LastWriteTime": last_write.strftime("%d/%m/%Y  %I:%M %p"),
-        "Length": file_stat.st_size,
-        "Name": file_path
-    }
+        file_info = {
+            "Mode": filemode.modeString(),
+            "LastWriteTime": last_write.strftime("%d/%m/%Y  %I:%M %p"),
+            "Length": file_stat.st_size,
+            "Name": file_path
+        }
 
-    # File type
-    file_type = "-"
-    if filemode.isDirectory():
-        file_type = "d"
+        # File type
+        file_type = "-"
+        if filemode.isDirectory():
+            file_type = "d"
 
-    # Non-hidden file
-    if all([file_type == "-",
-            ARGS.Directory is False,
-            ARGS.Hidden is False,
-            not filename.startswith(".")]):
-        print_file_row(file_stat,
-                       file_path,
-                       filemode)
+        # Non-hidden file
+        if all([file_type == "-",
+                ARGS.Directory is False,
+                ARGS.Hidden is False,
+                not filename.startswith(".")]):
+            print_file_row(file_stat,
+                           file_path,
+                           filemode)
 
     # Hidden file
-    if all([file_type == "-",
-            ARGS.Directory is False,
-            (ARGS.Hidden or ARGS.Force),
-            filename.startswith(".")]):
-        print_file_row(file_stat,
-                       file_path,
-                       filemode)
+        if all([file_type == "-",
+                ARGS.Directory is False,
+                (ARGS.Hidden or ARGS.Force),
+                filename.startswith(".")]):
+            print_file_row(file_stat,
+                           file_path,
+                           filemode)
 
-    # Non-hidden directory
-    if all([file_type == "d",
-            ARGS.File is False,
-            ARGS.Hidden is False,
-            not filename.startswith(".")]):
-        print_file_row(file_stat,
-                       file_path,
-                       filemode)
+        # Non-hidden directory
+        if all([file_type == "d",
+                ARGS.File is False,
+                ARGS.Hidden is False,
+                not filename.startswith(".")]):
+            print_file_row(file_stat,
+                           file_path,
+                           filemode)
 
-    # Hidden directory
-    if all([file_type == "d",
-            ARGS.File is False,
-            (ARGS.Hidden or ARGS.Force),
-            filename.startswith(".")]):
-        print_file_row(file_stat,
-                       file_path,
-                       filemode)
+        # Hidden directory
+        if all([file_type == "d",
+                ARGS.File is False,
+                (ARGS.Hidden or ARGS.Force),
+                filename.startswith(".")]):
+            print_file_row(file_stat,
+                           file_path,
+                           filemode)
