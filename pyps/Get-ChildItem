@@ -1,140 +1,225 @@
 #! /usr/bin/env python
-
-# Need to implement:
-#   -Include <String[]>
-#   -Exclude <String[]>
-#   -Recurse
-#   -Depth <UInt32>
-#   -Attributes <System.Management.Automation.FlagsExpression`1[System.IO.FileAttributes]>
-#   -FollowSymLink
-#   -ReadOnly
-#   -System
+"""
+This script means to re-implement Get-ChildItem from Powershell in Python
+in a cross-platform way. The idea is to allow basic Powershell scripts to
+Work on any system without powershell.
+"""
 
 import os
-from FilePermissions import *
 from datetime import datetime
 import argparse
+from FilePermissions import UserPermissions, GroupPermissions, OtherPermissions
 
-working_directory = "./"
-delimiter = "     "
+class FileMode:
+    """
+    Creates an object from os.stat mode to PowerShells values
+    """
+    def __init__(self, path, stat):
+        """
+        Constructor
+        """
 
-parser = argparse.ArgumentParser()
-parser.add_argument('path', metavar='P', type=str, nargs="?",
-                    help='The path to get list of files/directories')
-parser.add_argument('-Path', metavar='P', type=str,
-                    help='The path to get list of files/directories')
-parser.add_argument('-Force', action='store_true',
-                    help='Includes hidden files')
-parser.add_argument('-Hidden', action='store_true',
-                    help='Only displays hidden files')
-parser.add_argument('-Name', action='store_true',
-                    help='Gets only the names of the items in the locations')
-parser.add_argument('-File', action='store_true',
-                    help='Only displays files')
-parser.add_argument('-Directory', action='store_true',
-                    help='Only displays directories')
+        self.is_directory = False
+        self.is_archive   = False
+        self.is_readonly  = False
+        self.is_hidden    = False
+        self.is_system    = False
 
-args = parser.parse_args()
+        if os.path.isdir(path):
+            self.is_directory = True
 
-if args.path:
-    working_directory = args.path
+        if all([UserPermissions.read(stat.st_mode),
+                UserPermissions.write(stat.st_mode) is False,
+                UserPermissions.execute(stat.st_mode) is False]):
+            self.is_readonly = True
 
-if args.Path:
-    working_directory = args.Path
+        if path.split("/")[-1].startswith("."):
+            self.is_hidden = True
 
-def print_file_row(file_stat,
-                   file_path):
+    def isDirectory(self):
+        """Returns True if a file is a directory."""
+        return self.is_directory
+
+    def isArchive(self):
+        """Returns True if a file is an archive."""
+        return self.is_archive
+
+    def isReadOnly(self):
+        """Returns True if a file is read only."""
+        return self.is_readonly
+
+    def isHidden(self):
+        """Returns True if the file is hidden."""
+        return self.is_hidden
+
+    def isSystem(self):
+        """Returns True if the file is a system file."""
+        return self.is_system
+
+    def modeString(self):
+        """Prints the PowerShell file mode string"""
+        DIRECTORY = "-"
+        ARCHIVE   = "-"
+        READONLY  = "-"
+        HIDDEN    = "-"
+        SYSTEM    = "-"
+
+        if self.isDirectory():
+            DIRECTORY = "d"
+
+        if self.isArchive():
+            ARCHIVE = "a"
+
+        if self.isReadOnly():
+            READONLY = "r"
+
+        if self.isHidden():
+            HIDDEN = "h"
+
+        if self.isSystem():
+            SYSTEM = "s"
+
+        return DIRECTORY+ARCHIVE+READONLY+HIDDEN+SYSTEM
+
+def print_file_row(stat,
+                   path,
+                   mode):
     """
     Prints the formatted row.
 
     Arguments:
-        file_stat           tuple       os.stat return of the file
-        file_path           str         The absolute filepath
+        stat        tuple       os.stat return of the file
+        path        str         The absolute filepath
+        mode        FileMode    PS file mode class
     """
-    mode = file_stat.st_mode
+    if stat.st_mtime > file_stat.st_ctime:
+        last_write = datetime.fromtimestamp(stat.st_mtime)
+    else:
+        last_write = datetime.fromtimestamp(stat.st_ctime)
+
+    file_size_buffer = ""
+    if len(str(stat.st_size)) < 7:
+        file_size_length = 7 - len(str(stat.st_size))
+        for _ in range(1, file_size_length):
+            file_size_buffer += " "
+
+    if ARGS.Name is True:
+        print os.path.abspath(path)
+    elif ARGS.Name is False:
+        print mode.modeString() + \
+              DELIMITER + \
+              last_write.strftime("%d/%m/%Y  %I:%M %p") + \
+              DELIMITER + \
+              str(file_size_buffer) + str(stat.st_size) + " " + \
+              os.path.abspath(path)
+
+WORKING_DIRECTORY = "./"
+DELIMITER = "     "
+
+PARSER = argparse.ArgumentParser()
+PARSER.add_argument('path', metavar='PATH', type=str, nargs="?",
+                    help='The path to get list of files/directories')
+PARSER.add_argument('-Path', '-path', metavar='string', type=str,
+                    help='The paths to the items from which content is to ' + \
+                         'be retrieved. Wildcards are permitted. Default is' + \
+                         ' the current directory (.)')
+PARSER.add_argument('-Directory', '-directory', '-ad', action='store_true',
+                    help='Get directories (folders). To get only ' + \
+                         'directories, use -Directory and omit -File. To ' + \
+                         'exclude directories, use -File and omit ' + \
+                         '-Directory, or use the -Attributes parameter.')
+PARSER.add_argument('-File', '-file', action='store_true',
+                    help='Get files. To get only files, use -File and omit ' + \
+                         '-Directory. To exclude files, use -Directory and ' + \
+                         'omit -File, or use the -Attributes parameter.')
+PARSER.add_argument('-Hidden', '-hidden', '-ah', action='store_true',
+                    help='Get only hidden files and directories (folders). ' + \
+                         'By default, Get-ChildItem gets only non-hidden ' + \
+                         'items, use the -Force parameter to include both ' + \
+                         'hidden and non-hidden items in the results.')
+PARSER.add_argument('-Force', '-force', action='store_true',
+                    help='Get all items including hidden or system files, ' + \
+                         'but will not override security/file permissions. ' + \
+                         'You can also get hidden files and folders with ' + \
+                         '-Hidden or with the Hidden value of the ' + \
+                         '-Attributes parameter.')
+PARSER.add_argument('-Name', '-name', action='store_true',
+                    help='Retrieve only the names of the items. This is ' + \
+                         'useful when piping the names of the child items ' + \
+                         'to another command.')
+
+ARGS = PARSER.parse_args()
+
+if ARGS.path:
+    WORKING_DIRECTORY = ARGS.path
+
+if ARGS.Path:
+    WORKING_DIRECTORY = ARGS.Path
+
+# Header
+if ARGS.Name is False:
+    print "\n" + "\n" + "    Directory: " + os.path.abspath(WORKING_DIRECTORY) + "\n" + "\n"
+    print "Mode             LastWriteTime     Length Name"
+    print "----             -------------     ------ ----"
+
+for filename in os.listdir(WORKING_DIRECTORY):
+    if WORKING_DIRECTORY[-1] != "/":
+        file_path = WORKING_DIRECTORY + "/" + filename
+    else:
+        file_path = WORKING_DIRECTORY + filename
+
+    file_stat = os.stat(file_path)
+    filemode = FileMode(file_path, file_stat)
+
     if file_stat.st_mtime > file_stat.st_ctime:
         last_write = datetime.fromtimestamp(file_stat.st_mtime)
     else:
         last_write = datetime.fromtimestamp(file_stat.st_ctime)
 
-    file_size_buffer = ""
-    if len(str(file_stat.st_size)) < 7:
-        file_size_length = 7 - len(str(file_stat.st_size))
-        for space in range(1, file_size_length):
-            file_size_buffer += " "
-
-    if args.Name is True:
-        print os.path.abspath(file_path)
-    elif args.Name is False:
-        print file_type + \
-              UserPermissions.formatAsString(mode) + \
-              GroupPermissions.formatAsString(mode) + \
-              OtherPermissions.formatAsString(mode) + \
-              delimiter + \
-              last_write.strftime("%d/%m/%Y  %I:%M %p") + \
-              delimiter + \
-              str(file_size_buffer) + str(file_stat.st_size) + " " + \
-              os.path.abspath(file_path)
-
-# Header
-
-print "\n" + "\n" + "    Directory: " + os.path.abspath(working_directory) + "\n" + "\n"
-
-if args.Name is True:
-    print "Name"
-    print "----"
-elif args.Name is False:
-    print "Mode                  LastWriteTime     Length Name"
-    print "----                  -------------     ------ ----"
-
-
-for filename in os.listdir(working_directory):
-    if working_directory[-1] != "/":
-        file_path = working_directory + "/" + filename
-    else:
-        file_path = working_directory + filename
-    file_stat = os.stat(file_path)
+    file_info = {
+        "Mode": filemode.modeString(),
+        "LastWriteTime": last_write.strftime("%d/%m/%Y  %I:%M %p"),
+        "Length": file_stat.st_size,
+        "Name": file_path
+    }
 
     # File type
     file_type = "-"
-    if os.path.isdir(file_path):
+    if filemode.isDirectory():
         file_type = "d"
-
-    # File Size
-    file_size_buffer = ""
-    if len(str(file_stat.st_size)) < 7:
-        file_size_length = 7 - len(str(file_stat.st_size))
-        for space in range(1, file_size_length):
-            file_size_buffer += " "
 
     # Non-hidden file
     if all([file_type == "-",
-            args.Directory is False,
-            args.Hidden is False,
+            ARGS.Directory is False,
+            ARGS.Hidden is False,
             not filename.startswith(".")]):
         print_file_row(file_stat,
-                       file_path)
+                       file_path,
+                       filemode)
 
     # Hidden file
     if all([file_type == "-",
-            args.Directory is False,
-            (args.Hidden or args.Force),
+            ARGS.Directory is False,
+            (ARGS.Hidden or ARGS.Force),
             filename.startswith(".")]):
         print_file_row(file_stat,
-                       file_path)
+                       file_path,
+                       filemode)
 
     # Non-hidden directory
     if all([file_type == "d",
-            args.File is False,
-            args.Hidden is False,
+            ARGS.File is False,
+            ARGS.Hidden is False,
             not filename.startswith(".")]):
         print_file_row(file_stat,
-                       file_path)
+                       file_path,
+                       filemode)
 
     # Hidden directory
     if all([file_type == "d",
-            args.File is False,
-            (args.Hidden or args.Force),
+            ARGS.File is False,
+            (ARGS.Hidden or ARGS.Force),
             filename.startswith(".")]):
         print_file_row(file_stat,
-                       file_path)
+                       file_path,
+                       filemode)
