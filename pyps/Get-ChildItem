@@ -117,8 +117,8 @@ WORKING_DIRECTORIES = []
 DELIMITER = "     "
 
 PARSER = argparse.ArgumentParser()
-PARSER.add_argument('path', metavar='PATH', type=str, nargs="*",
-                    help='The path to get list of files/directories')
+#   PARSER.add_argument('path', metavar='PATH', type=str, nargs="*",
+#                       help='The path to get list of files/directories')
 PARSER.add_argument('-Path', '-path', metavar='string', type=str, nargs="*",
                     help='The paths to the items from which content is to ' + \
                          'be retrieved. Wildcards are permitted. Default is' + \
@@ -147,17 +147,18 @@ PARSER.add_argument('-Name', '-name', action='store_true',
                     help='Retrieve only the names of the items. This is ' + \
                          'useful when piping the names of the child items ' + \
                          'to another command.')
+PARSER.add_argument('-ReadOnly', '-readonly', '-ar', action='store_true',
+                    help='Get only read-only files and directories ' + \
+                         '(folders). To exclude read-only items, use the ' + \
+                         '-Attributes parameter.')
 
 ARGS = PARSER.parse_args()
 
 if ARGS.Path is not None:
     for path in ARGS.Path:
         WORKING_DIRECTORIES.append(path)
-elif ARGS.path is not None:
-    for path in ARGS.path:
-        WORKING_DIRECTORIES.append(path)
 else:
-    WORKING_DIRECTORIES = ["./"]
+    WORKING_DIRECTORIES = ['./']
 
 for WORKING_DIRECTORY in WORKING_DIRECTORIES:
 
@@ -198,33 +199,57 @@ for WORKING_DIRECTORY in WORKING_DIRECTORIES:
                 ARGS.Directory is False,
                 ARGS.Hidden is False,
                 not filename.startswith(".")]):
-            print_file_row(file_stat,
-                           file_path,
-                           filemode)
-
-    # Hidden file
+            if ARGS.ReadOnly:
+                if filemode.isReadOnly() == True:
+                    print_file_row(file_stat,
+                                   file_path,
+                                   filemode)
+            else:
+                    print_file_row(file_stat,
+                                   file_path,
+                                   filemode)
+                
+        # Hidden file
         if all([file_type == "-",
                 ARGS.Directory is False,
                 (ARGS.Hidden or ARGS.Force),
                 filename.startswith(".")]):
-            print_file_row(file_stat,
-                           file_path,
-                           filemode)
+            if ARGS.ReadOnly:
+                if filemode.isReadOnly() == True:
+                    print_file_row(file_stat,
+                                   file_path,
+                                   filemode)
+            else:
+                    print_file_row(file_stat,
+                                   file_path,
+                                   filemode)
 
         # Non-hidden directory
         if all([file_type == "d",
                 ARGS.File is False,
                 ARGS.Hidden is False,
                 not filename.startswith(".")]):
-            print_file_row(file_stat,
-                           file_path,
-                           filemode)
+            if ARGS.ReadOnly:
+                if filemode.isReadOnly() == True:
+                    print_file_row(file_stat,
+                                   file_path,
+                                   filemode)
+            else:
+                    print_file_row(file_stat,
+                                   file_path,
+                                   filemode)
 
         # Hidden directory
         if all([file_type == "d",
                 ARGS.File is False,
                 (ARGS.Hidden or ARGS.Force),
                 filename.startswith(".")]):
-            print_file_row(file_stat,
-                           file_path,
-                           filemode)
+            if ARGS.ReadOnly:
+                if filemode.isReadOnly() == True:
+                    print_file_row(file_stat,
+                                   file_path,
+                                   filemode)
+            else:
+                    print_file_row(file_stat,
+                                   file_path,
+                                   filemode)
