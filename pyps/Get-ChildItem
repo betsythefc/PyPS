@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 
 # Need to implement:
-#   -Filter <String>
 #   -Include <String[]>
 #   -Exclude <String[]>
 #   -Recurse
@@ -10,10 +9,6 @@
 #   -FollowSymLink
 #   -ReadOnly
 #   -System
-
-# Partially implemented:
-#   Path <String[]>
-#       Currently can accept one argument, looping/recurse not working yet.
 
 import os
 from FilePermissions import *
